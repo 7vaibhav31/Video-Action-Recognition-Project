@@ -181,7 +181,7 @@ predictBtn.addEventListener('click', async () => {
   // Determine API URL based on host (local vs deployed backend)
   const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://127.0.0.1:5000'
-    : 'https://your-backend-app.onrender.com'; // Replace with your Render backend URL once deployed
+    : 'https://video-action-recognition-project.onrender.com';
 
   const formData = new FormData();
   formData.append('video', videoFile);
