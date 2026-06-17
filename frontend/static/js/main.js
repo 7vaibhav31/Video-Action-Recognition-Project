@@ -178,11 +178,16 @@ predictBtn.addEventListener('click', async () => {
   clearResult();
   clearError();
 
+  // Determine API URL based on host (local vs deployed backend)
+  const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:5000'
+    : 'https://your-backend-app.onrender.com'; // Replace with your Render backend URL once deployed
+
   const formData = new FormData();
   formData.append('video', videoFile);
 
   try {
-    const response = await fetch('/predict', {
+    const response = await fetch(`${API_BASE}/predict`, {
       method: 'POST',
       body: formData,
     });
@@ -204,7 +209,7 @@ predictBtn.addEventListener('click', async () => {
     showResult(data);
   } catch (err) {
     console.error('Fetch error:', err);
-    showError('Network error. Make sure the server is running at http://localhost:5000');
+    showError(`Network error. Make sure the backend server is running at ${API_BASE}`);
   } finally {
     setLoading(false);
     // Reset so a new file can be picked immediately

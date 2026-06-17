@@ -7,10 +7,12 @@ import os
 import uuid
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 from inference import load_models, predict
 
 # ── App Setup ──────────────────────────────────────────────────────
 app = Flask(__name__)
+CORS(app)  # Enable CORS for cross-origin API calls from Vercel
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200 MB max upload
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 
@@ -27,7 +29,14 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return jsonify({
+        'status': 'active',
+        'message': 'ActionNet Video Action Recognition API is running.',
+        'endpoints': {
+            'predict': '/predict (POST)',
+            'health': '/health (GET)'
+        }
+    })
 
 
 @app.route('/predict', methods=['POST'])

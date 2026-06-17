@@ -24,14 +24,14 @@ ENV/
 *.h5
 *.pb
 *.onnx
-!models/model_optionA_final.keras
+!backend/models/model_optionA_final.keras
 
 # NumPy saved arrays
 *.npy
 *.npz
 
 # Upload temp files
-static/uploads/
+backend/static/uploads/
 uploads/
 
 # IDE / OS
