@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual Environment
+venv/
+env/
+.env/
+ENV/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Model files (too large for GitHub — download separately)
+*.keras
+*.h5
+*.pb
+*.onnx
+
+# NumPy saved arrays
+*.npy
+*.npz
+
+# Upload temp files
+frontend/static/uploads/
+uploads/
+
+# IDE / OS
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Vercel
+.vercel/
