@@ -52,6 +52,16 @@ def _build_cnn():
 def load_models():
     """Load both models into memory. Call once at app startup."""
     global _cnn_model, _lstm_model
+    
+    # Optimize TensorFlow CPU performance on limited hosting environments (like Render Free CPU)
+    # Restricts thread spawning overhead to prevent CPU throttling and context switching
+    try:
+        tf.config.threading.set_intra_op_parallelism_threads(1)
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+        print("[inference] TensorFlow CPU threading optimized (threads set to 1).")
+    except Exception as e:
+        print(f"[inference] Warning: Could not set TensorFlow threading configuration: {e}")
+
     print("[inference] Loading ResNet50 feature extractor...")
     _cnn_model = _build_cnn()
     print("[inference] ResNet50 loaded.")
