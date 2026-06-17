@@ -66,16 +66,21 @@ def extract_frames(video_path):
     Extract NUM_FRAMES uniformly sampled frames from a video.
     Returns numpy array of shape (NUM_FRAMES, IMG_SIZE, IMG_SIZE, 3).
     """
+    print(f"\n[inference] Loading video file: {video_path}")
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"[inference] Total frames in video: {total_frames}")
 
     if total_frames == 0:
+        print("[inference] ERROR: Total frames is 0. Failed to load video.")
         cap.release()
         return None
 
     frame_indices = np.linspace(0, total_frames - 1, NUM_FRAMES, dtype=int)
+    print(f"[inference] Sampling 16 frames at indices: {list(frame_indices)}")
     frames = []
 
+    print("[inference] Preprocessing: Converting BGR to RGB, resizing to 224x224, normalizing to [0,1]...")
     for idx in frame_indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
@@ -88,7 +93,9 @@ def extract_frames(video_path):
             frames.append(np.zeros((IMG_SIZE, IMG_SIZE, 3)))
 
     cap.release()
-    return np.array(frames, dtype=np.float32)
+    preprocessed_array = np.array(frames, dtype=np.float32)
+    print(f"[inference] Preprocessing complete. Tensor shape: {preprocessed_array.shape}")
+    return preprocessed_array
 
 
 def predict(video_path):
@@ -118,15 +125,21 @@ def predict(video_path):
             return {"error": "Could not read video or video is too short."}
 
         # Step 2: Extract CNN features → (16, 2048)
+        print("[inference] Running ResNet50 feature extraction...")
         features = _cnn_model.predict(frames, verbose=0)  # (16, 2048)
+        print(f"[inference] Feature extraction complete. Output shape: {features.shape}")
 
         # Step 3: Add batch dim → (1, 16, 2048) and run LSTM
+        print("[inference] Running LSTM classification...")
         features_batch = np.expand_dims(features, axis=0)
         probs = _lstm_model.predict(features_batch, verbose=0)[0]  # (20,)
-
+        
         # Step 4: Build results
         top_idx = int(np.argmax(probs))
         top3_indices = np.argsort(probs)[::-1][:3]
+        
+        print(f"[inference] Model prediction complete. Top Class: {SELECTED_CLASSES[top_idx]} ({probs[top_idx]*100:.2f}%)")
+        print(f"[inference] Top 3 probabilities: " + ", ".join([f"{SELECTED_CLASSES[i]}: {probs[i]*100:.1f}%" for i in top3_indices]))
 
         processing_time = round(time.time() - start, 2)
 
@@ -145,4 +158,5 @@ def predict(video_path):
         }
 
     except Exception as e:
+        print(f"[inference] EXCEPTION encountered during prediction: {e}")
         return {"error": str(e)}
