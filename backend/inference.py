@@ -71,41 +71,147 @@ def load_models():
     print("[inference] LSTM model loaded. Ready for inference.")
 
 
-def extract_frames(video_path):
-    """
-    Extract NUM_FRAMES uniformly sampled frames from a video.
-    Returns numpy array of shape (NUM_FRAMES, IMG_SIZE, IMG_SIZE, 3).
-    """
-    print(f"\n[inference] Loading video file: {video_path}")
+def extract_frames_opencv(video_path):
+    """Attempt to extract frames using OpenCV."""
     cap = cv2.VideoCapture(video_path)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(f"[inference] Total frames in video: {total_frames}")
-
-    if total_frames == 0:
-        print("[inference] ERROR: Total frames is 0. Failed to load video.")
+    if not cap.isOpened():
+        print("[inference] OpenCV: VideoCapture failed to open file.")
         cap.release()
         return None
+        
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"[inference] OpenCV: Total frames in video: {total_frames}")
 
-    frame_indices = np.linspace(0, total_frames - 1, NUM_FRAMES, dtype=int)
-    print(f"[inference] Sampling 16 frames at indices: {list(frame_indices)}")
+    if total_frames <= 0:
+        print("[inference] OpenCV: Total frames <= 0. Attempting sequential read...")
+        count = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            count += 1
+        total_frames = count
+        print(f"[inference] OpenCV: Counted {total_frames} frames sequentially.")
+        cap.release()
+        cap = cv2.VideoCapture(video_path)
+        if total_frames <= 0:
+            cap.release()
+            return None
+
+    frame_indices = set(np.linspace(0, total_frames - 1, NUM_FRAMES, dtype=int))
+    print(f"[inference] OpenCV: Sampling 16 frames at indices: {list(sorted(frame_indices))}")
+    
     frames = []
-
-    print("[inference] Preprocessing: Converting BGR to RGB, resizing to 224x224, normalizing to [0,1]...")
-    for idx in frame_indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    count = 0
+    while len(frames) < NUM_FRAMES:
         ret, frame = cap.read()
-        if ret:
+        if not ret:
+            break
+        if count in frame_indices:
             frame = cv2.resize(frame, (IMG_SIZE, IMG_SIZE))
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = frame / 255.0
             frames.append(frame)
-        else:
-            frames.append(np.zeros((IMG_SIZE, IMG_SIZE, 3)))
-
+        count += 1
+        
     cap.release()
-    preprocessed_array = np.array(frames, dtype=np.float32)
-    print(f"[inference] Preprocessing complete. Tensor shape: {preprocessed_array.shape}")
-    return preprocessed_array
+
+    # Only pad if we got at least 1 frame, otherwise return None to fallback
+    if len(frames) > 0:
+        while len(frames) < NUM_FRAMES:
+            print(f"[inference] OpenCV Warning: padded frame with zeros (got {len(frames)} of {NUM_FRAMES})")
+            frames.append(np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.float32))
+        return np.array(frames, dtype=np.float32)
+    return None
+
+
+def extract_frames_pyav(video_path):
+    """Attempt to extract frames using PyAV (av)."""
+    import av
+    container = av.open(video_path)
+    try:
+        if not container.streams.video:
+            print("[inference] PyAV: No video stream found in container.")
+            return None
+        stream = container.streams.video[0]
+        total_frames = stream.frames
+        
+        if total_frames is None or total_frames <= 0:
+            print("[inference] PyAV: Stream frames <= 0 or None. Counting sequentially...")
+            total_frames = 0
+            for frame in container.decode(video=0):
+                total_frames += 1
+            print(f"[inference] PyAV: Counted {total_frames} frames sequentially.")
+            container.close()
+            container = av.open(video_path)
+            
+        if total_frames <= 0:
+            print("[inference] PyAV: Total counted frames <= 0.")
+            return None
+            
+        frame_indices = set(np.linspace(0, total_frames - 1, NUM_FRAMES, dtype=int))
+        print(f"[inference] PyAV: Sampling 16 frames at indices: {list(sorted(frame_indices))}")
+        
+        frames = []
+        count = 0
+        for frame in container.decode(video=0):
+            if count in frame_indices:
+                img = frame.to_ndarray(format='rgb24')
+                img_resized = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+                img_normalized = img_resized / 255.0
+                frames.append(img_normalized)
+                if len(frames) == NUM_FRAMES:
+                    break
+            count += 1
+            
+        if len(frames) > 0:
+            while len(frames) < NUM_FRAMES:
+                print(f"[inference] PyAV Warning: padded frame with zeros (got {len(frames)} of {NUM_FRAMES})")
+                frames.append(np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.float32))
+            return np.array(frames, dtype=np.float32)
+        return None
+    finally:
+        container.close()
+
+
+def extract_frames(video_path):
+    """
+    Extract NUM_FRAMES uniformly sampled frames from a video.
+    Tries OpenCV first, and falls back to PyAV if OpenCV fails.
+    Returns tuple (numpy array, error_message).
+    """
+    print(f"\n[inference] Loading video file: {video_path}")
+    
+    cv_error = None
+    pyav_error = None
+    
+    # 1. Try OpenCV
+    try:
+        frames = extract_frames_opencv(video_path)
+        if frames is not None and len(frames) == NUM_FRAMES:
+            print("[inference] OpenCV extraction succeeded.")
+            return frames, None
+        cv_error = "OpenCV returned 0 or incomplete frames."
+    except Exception as e:
+        cv_error = f"OpenCV Exception: {str(e)}"
+        print(f"[inference] OpenCV extraction failed with exception: {e}")
+        
+    print("[inference] OpenCV failed. Trying PyAV as fallback...")
+    
+    # 2. Try PyAV
+    try:
+        frames = extract_frames_pyav(video_path)
+        if frames is not None and len(frames) == NUM_FRAMES:
+            print("[inference] PyAV extraction succeeded.")
+            return frames, None
+        pyav_error = "PyAV returned 0 or incomplete frames."
+    except Exception as e:
+        pyav_error = f"PyAV Exception: {str(e)}"
+        print(f"[inference] PyAV extraction failed with exception: {e}")
+        
+    combined_error = f"OpenCV Error: {cv_error} | PyAV Error: {pyav_error}"
+    print(f"[inference] ERROR: All frame extraction backends failed. {combined_error}")
+    return None, combined_error
 
 
 def predict(video_path):
@@ -130,9 +236,9 @@ def predict(video_path):
 
     try:
         # Step 1: Extract frames
-        frames = extract_frames(video_path)
-        if frames is None or len(frames) != NUM_FRAMES:
-            return {"error": "Could not read video or video is too short."}
+        frames, err_msg = extract_frames(video_path)
+        if frames is None:
+            return {"error": f"Could not read video: {err_msg if err_msg else 'Unknown frame extraction error.'}"}
 
         # Step 2: Extract CNN features → (16, 2048)
         print("[inference] Running ResNet50 feature extraction...")

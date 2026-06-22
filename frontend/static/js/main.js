@@ -167,14 +167,69 @@ const loadingState = document.getElementById('loading-state');
 const resultContent = document.getElementById('result-content');
 const errorState   = document.getElementById('error-state');
 
+// Helper to wait
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Polling loop to query task status
+async function pollTaskStatus(taskId, apiBase) {
+  const maxPolls = 60; // 120 seconds total timeout
+  let pollCount = 0;
+  let consecFailures = 0;
+
+  while (pollCount < maxPolls) {
+    pollCount++;
+    // Update progress dots and status text dynamically in the UI
+    const dots = '.'.repeat((pollCount % 3) + 1);
+    setLoading(
+      true, 
+      `Analyzing${dots}`, 
+      `Running prediction pipeline (step ${pollCount}/${maxPolls})...`
+    );
+
+    try {
+      const response = await fetch(`${apiBase}/status/${taskId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+      consecFailures = 0; // Reset consecutive failures on success
+
+      if (data.status === 'complete') {
+        showResult(data.result);
+        return true;
+      } else if (data.status === 'failed') {
+        showError(data.error || 'Server-side inference failed.');
+        return false;
+      } else {
+        // Status is 'processing', wait and continue
+        await delay(2000);
+      }
+    } catch (err) {
+      console.warn('Poll request failed:', err);
+      consecFailures++;
+      if (consecFailures >= 5) {
+        showError(`Lost connection to the backend server. Please make sure it is still running.`);
+        return false;
+      }
+      // Retry after delay
+      await delay(2000);
+    }
+  }
+
+  showError('Analysis timed out. The server took too long to respond. Please try a shorter video.');
+  return false;
+}
+
 predictBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
 
   // Capture reference before async (selectedFile may change)
   const videoFile = selectedFile;
 
-  // Show loading
-  setLoading(true);
+  // Show initial loading state (Upload phase)
+  setLoading(true, 'Uploading...', 'Uploading video file to server...');
   clearResult();
   clearError();
 
@@ -209,7 +264,13 @@ predictBtn.addEventListener('click', async () => {
       return;
     }
 
-    showResult(data);
+    if (data.status === 'processing' && data.task_id) {
+      // Start polling status
+      setLoading(true, 'Analyzing...', 'Queueing task on server...');
+      await pollTaskStatus(data.task_id, API_BASE);
+    } else {
+      showError('Unexpected response from server.');
+    }
   } catch (err) {
     console.error('Fetch error:', err);
     showError(`Network error. Make sure the backend server is running at ${API_BASE}`);
@@ -225,16 +286,23 @@ predictBtn.addEventListener('click', async () => {
 
 
 // ── UI State Helpers ─────────────────────────────────────────────
-function setLoading(on) {
+function setLoading(on, text = 'Analyzing...', subtext = 'Extracting frames → CNN features → LSTM prediction') {
   loadingState.classList.toggle('visible', on);
   predictBtn.disabled = on;
+
+  const loaderText = loadingState.querySelector('.loader-text');
+  const loaderSub  = loadingState.querySelector('.loader-sub');
+
+  if (loaderText) loaderText.textContent = text;
+  if (loaderSub)  loaderSub.textContent  = subtext;
+
   // Use innerHTML to preserve the SVG icon inside the button
   if (on) {
     predictBtn.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 0.8s linear infinite">
         <path d="M12 2a10 10 0 0 1 10 10" />
       </svg>
-      Analyzing...`;
+      ${text}`;
   } else {
     predictBtn.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">

@@ -1,10 +1,7 @@
-"""
-app.py — Main Flask application for Video Action Recognition.
-Serves the dashboard and handles video upload + inference.
-"""
-
 import os
 import uuid
+import json
+import threading
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
@@ -25,6 +22,37 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+# ── Background Worker ──────────────────────────────────────────────
+def async_inference_task(task_id, video_path):
+    status_file = os.path.join(app.config['UPLOAD_FOLDER'], f"task_{task_id}.json")
+    try:
+        # Run inference
+        result = predict(video_path)
+        
+        if result.get('error'):
+            task_data = {'status': 'failed', 'error': result['error']}
+        else:
+            task_data = {'status': 'complete', 'result': result}
+            
+    except Exception as e:
+        task_data = {'status': 'failed', 'error': str(e)}
+        
+    finally:
+        # Clean up video file
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except Exception as e:
+                print(f"[app] Warning: Failed to remove temp video {video_path}: {e}")
+                
+    # Save result to status file
+    try:
+        with open(status_file, 'w') as f:
+            json.dump(task_data, f)
+    except Exception as e:
+        print(f"[app] Error writing task result file {status_file}: {e}")
+
+
 # ── Routes ─────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -34,6 +62,7 @@ def index():
         'message': 'ActionNet Video Action Recognition API is running.',
         'endpoints': {
             'predict': '/predict (POST)',
+            'status': '/status/<task_id> (GET)',
             'health': '/health (GET)'
         }
     })
@@ -54,19 +83,52 @@ def predict_action():
 
     # Save with unique name to avoid collisions
     ext = file.filename.rsplit('.', 1)[1].lower()
-    unique_filename = f"{uuid.uuid4().hex}.{ext}"
+    task_id = uuid.uuid4().hex
+    unique_filename = f"{task_id}.{ext}"
     save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
 
     try:
         file.save(save_path)
-        result = predict(save_path)
-        return jsonify(result)
+        
+        # Write initial processing status file
+        status_file = os.path.join(app.config['UPLOAD_FOLDER'], f"task_{task_id}.json")
+        with open(status_file, 'w') as f:
+            json.dump({'status': 'processing'}, f)
+            
+        # Start background thread for prediction
+        thread = threading.Thread(target=async_inference_task, args=(task_id, save_path))
+        thread.start()
+        
+        return jsonify({'task_id': task_id, 'status': 'processing'})
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        # Clean up uploaded file after prediction
         if os.path.exists(save_path):
             os.remove(save_path)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/status/<task_id>', methods=['GET'])
+def get_status(task_id):
+    task_id = secure_filename(task_id)
+    status_file = os.path.join(app.config['UPLOAD_FOLDER'], f"task_{task_id}.json")
+    
+    if not os.path.exists(status_file):
+        return jsonify({'error': 'Task not found'}), 404
+        
+    try:
+        with open(status_file, 'r') as f:
+            data = json.load(f)
+            
+        # If task is complete or failed, clean up the status file
+        if data.get('status') in ['complete', 'failed']:
+            try:
+                os.remove(status_file)
+            except Exception as e:
+                print(f"[app] Warning: Failed to delete status file {status_file}: {e}")
+                
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': f'Failed to read task status: {str(e)}'}), 500
 
 
 @app.route('/health')
