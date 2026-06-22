@@ -264,7 +264,32 @@
             <div class="loader-step"></div>
             <div class="loader-step"></div>
           </div>
+
+          <!-- Play Tic-Tac-Toe Game -->
+          <div id="game-container" style="display: block; margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px; font-weight: 500;">
+              🕹️ Play Tic-Tac-Toe against the AI while you wait:
+            </div>
+            <div class="game-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 180px; margin: 0 auto;">
+              <button class="cell" data-index="0" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="1" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="2" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="3" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="4" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="5" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="6" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="7" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+              <button class="cell" data-index="8" style="aspect-ratio: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1.25rem; font-family: var(--font-head); font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: background 0.2s;"></button>
+            </div>
+            <div id="game-status" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 10px; font-weight: 500;">
+              Your turn (X)
+            </div>
+            <button id="reset-game-btn" style="margin-top: 10px; padding: 4px 12px; background: #fff; color: #000; border: none; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; cursor: pointer; font-family: var(--font-head); display: none;">
+              Reset Game
+            </button>
+          </div>
         </div>
+
 
         <!-- Predict Button -->
         <button id="predict-btn" disabled>

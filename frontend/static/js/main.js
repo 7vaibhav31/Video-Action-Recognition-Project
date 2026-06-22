@@ -290,6 +290,10 @@ function setLoading(on, text = 'Analyzing...', subtext = 'Extracting frames → 
   loadingState.classList.toggle('visible', on);
   predictBtn.disabled = on;
 
+  if (on && typeof resetGame === 'function') {
+    resetGame();
+  }
+
   const loaderText = loadingState.querySelector('.loader-text');
   const loaderSub  = loadingState.querySelector('.loader-sub');
 
@@ -413,3 +417,158 @@ const statsObserver = new IntersectionObserver((entries) => {
 
 const statsEl = document.querySelector('.hero-stats');
 if (statsEl) statsObserver.observe(statsEl);
+
+
+// ── Tic-Tac-Toe Game Logic ───────────────────────────────────────
+const cells = document.querySelectorAll('.cell');
+const gameStatus = document.getElementById('game-status');
+const resetBtn = document.getElementById('reset-game-btn');
+
+let board = ['', '', '', '', '', '', '', '', ''];
+let isGameActive = true;
+let currentPlayer = 'X'; // X is human, O is AI
+
+const winningConditions = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6]
+];
+
+function handleCellClick(e) {
+  const clickedCell = e.target;
+  const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
+
+  if (board[clickedCellIndex] !== '' || !isGameActive || currentPlayer !== 'X') {
+    return;
+  }
+
+  makeMove(clickedCellIndex, 'X');
+  
+  if (checkWin('X')) {
+    endGame('X');
+    return;
+  }
+  
+  if (checkDraw()) {
+    endGame('draw');
+    return;
+  }
+
+  // AI Turn
+  currentPlayer = 'O';
+  gameStatus.textContent = 'AI is thinking...';
+  setTimeout(makeAIMove, 500);
+}
+
+function makeMove(index, player) {
+  board[index] = player;
+  cells[index].textContent = player;
+  cells[index].style.background = player === 'X' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)';
+}
+
+function makeAIMove() {
+  if (!isGameActive) return;
+
+  // Simple AI: Find best move or random
+  let move = findWinningMove('O'); // Try to win
+  if (move === null) {
+    move = findWinningMove('X'); // Try to block
+  }
+  if (move === null) {
+    // Pick center if free
+    if (board[4] === '') {
+      move = 4;
+    }
+  }
+  if (move === null) {
+    // Pick random corner
+    const corners = [0, 2, 6, 8].filter(i => board[i] === '');
+    if (corners.length > 0) {
+      move = corners[Math.floor(Math.random() * corners.length)];
+    }
+  }
+  if (move === null) {
+    // Pick any remaining open cell
+    const emptyCells = board.map((val, i) => val === '' ? i : null).filter(val => val !== null);
+    if (emptyCells.length > 0) {
+      move = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    }
+  }
+
+  if (move !== null) {
+    makeMove(move, 'O');
+    
+    if (checkWin('O')) {
+      endGame('O');
+      return;
+    }
+    
+    if (checkDraw()) {
+      endGame('draw');
+      return;
+    }
+    
+    currentPlayer = 'X';
+    gameStatus.textContent = 'Your turn (X)';
+  }
+}
+
+function findWinningMove(player) {
+  for (let condition of winningConditions) {
+    const [a, b, c] = condition;
+    const values = [board[a], board[b], board[c]];
+    const playerCount = values.filter(v => v === player).length;
+    const emptyCount = values.filter(v => v === '').length;
+    
+    if (playerCount === 2 && emptyCount === 1) {
+      if (board[a] === '') return a;
+      if (board[b] === '') return b;
+      if (board[c] === '') return c;
+    }
+  }
+  return null;
+}
+
+function checkWin(player) {
+  return winningConditions.some(condition => {
+    return condition.every(index => board[index] === player);
+  });
+}
+
+function checkDraw() {
+  return board.every(cell => cell !== '');
+}
+
+function endGame(result) {
+  isGameActive = false;
+  resetBtn.style.display = 'inline-block';
+  
+  if (result === 'draw') {
+    gameStatus.textContent = "It's a draw!";
+  } else if (result === 'X') {
+    gameStatus.textContent = "🏆 You beat the AI!";
+  } else {
+    gameStatus.textContent = "💻 AI won! Try again.";
+  }
+}
+
+function resetGame() {
+  board = ['', '', '', '', '', '', '', '', ''];
+  isGameActive = true;
+  currentPlayer = 'X';
+  gameStatus.textContent = 'Your turn (X)';
+  resetBtn.style.display = 'none';
+  cells.forEach(cell => {
+    cell.textContent = '';
+    cell.style.background = 'var(--bg-card)';
+  });
+}
+
+// Add event listeners to Tic-Tac-Toe board
+cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+resetBtn.addEventListener('click', resetGame);
