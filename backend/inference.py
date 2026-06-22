@@ -5,7 +5,18 @@ once at startup. Exposes a predict(video_path) function.
 """
 
 import os
+
+# Limit TensorFlow thread-pool allocations before importing to conserve memory
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
 import time
+import gc
 import numpy as np
 import cv2
 import tensorflow as tf
@@ -276,3 +287,6 @@ def predict(video_path):
     except Exception as e:
         print(f"[inference] EXCEPTION encountered during prediction: {e}")
         return {"error": str(e)}
+    finally:
+        # Explicitly run garbage collection to free temporary tensors from memory
+        gc.collect()
