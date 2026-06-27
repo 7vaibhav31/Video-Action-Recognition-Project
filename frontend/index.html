@@ -201,7 +201,7 @@
     <h2 class="section-title">Analyze Your Video</h2>
     <p class="section-desc">Upload a video file and our model will predict the human action with confidence scores.</p>
 
-    <div class="dashboard-grid">
+    <div class="dashboard-stack">
 
       <!-- Upload Card -->
       <div class="upload-card reveal">
@@ -432,7 +432,7 @@
       <!-- end results card -->
 
     </div>
-    <!-- end dashboard-grid -->
+    <!-- end dashboard-stack -->
   </div>
 </section>
 
@@ -506,72 +506,30 @@
 
     <div class="model-grid">
 
+      <!-- Model 1 -->
       <div class="model-card reveal">
-        <div class="model-card-title">Architecture Specs</div>
+        <div class="model-card-title">Model 1: Custom CNN + LSTM</div>
         <ul class="spec-list">
-          <li class="spec-item">
-            <span class="spec-key">Transformer Model</span>
-            <span class="spec-val">VideoMAE (86M Params)</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Custom Model</span>
-            <span class="spec-val">ResNet50 + LSTM</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Frames per Video</span>
-            <span class="spec-val">16 (MAE) / 30 (LSTM)</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Input Resolution</span>
-            <span class="spec-val">224 × 224 × 3</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Primary Dataset</span>
-            <span class="spec-val">Kinetics-400</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Secondary Dataset</span>
-            <span class="spec-val">UCF-50</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Output Classes</span>
-            <span class="spec-val">400 (Softmax)</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Frameworks</span>
-            <span class="spec-val">PyTorch & TensorFlow</span>
-          </li>
+          <li class="spec-item"><span class="spec-key">Architecture</span><span class="spec-val">ResNet50 + 2-Layer LSTM</span></li>
+          <li class="spec-item"><span class="spec-key">Total Parameters</span><span class="spec-val">2.6 Million</span></li>
+          <li class="spec-item"><span class="spec-key">Training Data</span><span class="spec-val">UCF50 Dataset</span></li>
+          <li class="spec-item"><span class="spec-key">Output Classes</span><span class="spec-val">50 Actions</span></li>
+          <li class="spec-item"><span class="spec-key">Input Frames</span><span class="spec-val">30 uniformly sampled</span></li>
+          <li class="spec-item"><span class="spec-key">Framework</span><span class="spec-val">TensorFlow / Keras</span></li>
         </ul>
       </div>
 
-      <div class="model-card reveal">
-        <div class="model-card-title">Supported Action Classes (Samples)</div>
-        <div class="classes-grid">
-          <span class="class-tag">Basketball</span>
-          <span class="class-tag">TennisSwing</span>
-          <span class="class-tag">GolfSwing</span>
-          <span class="class-tag">Archery</span>
-          <span class="class-tag">Bowling</span>
-          <span class="class-tag">Diving</span>
-          <span class="class-tag">Rafting</span>
-          <span class="class-tag">Surfing</span>
-          <span class="class-tag">PullUps</span>
-          <span class="class-tag">PushUps</span>
-          <span class="class-tag">Lunges</span>
-          <span class="class-tag">JumpingJack</span>
-          <span class="class-tag">Skiing</span>
-          <span class="class-tag">HorseRiding</span>
-          <span class="class-tag">Biking</span>
-          <span class="class-tag">Typing</span>
-          <span class="class-tag">Swing</span>
-          <span class="class-tag">WalkingWithDog</span>
-          <span class="class-tag">IceDancing</span>
-          <span class="class-tag">PlayingGuitar</span>
-          <span class="class-tag">Sneezing</span>
-          <span class="class-tag">Shaking Hands</span>
-          <span class="class-tag">Mowing Lawn</span>
-          <span class="class-tag">Pizza Tossing</span>
-        </div>
+      <!-- Model 2 -->
+      <div class="model-card reveal" style="animation-delay:0.1s">
+        <div class="model-card-title">Model 2: Vision Transformer</div>
+        <ul class="spec-list">
+          <li class="spec-item"><span class="spec-key">Architecture</span><span class="spec-val">VideoMAE (Hugging Face)</span></li>
+          <li class="spec-item"><span class="spec-key">Total Parameters</span><span class="spec-val">86 Million</span></li>
+          <li class="spec-item"><span class="spec-key">Training Data</span><span class="spec-val">Kinetics-400</span></li>
+          <li class="spec-item"><span class="spec-key">Output Classes</span><span class="spec-val">400 Actions</span></li>
+          <li class="spec-item"><span class="spec-key">Input Frames</span><span class="spec-val">16 uniformly sampled</span></li>
+          <li class="spec-item"><span class="spec-key">Framework</span><span class="spec-val">PyTorch</span></li>
+        </ul>
       </div>
 
     </div>

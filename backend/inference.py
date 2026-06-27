@@ -37,10 +37,12 @@ def load_models():
     
     print("[inference] Loading Hugging Face VideoMAE model...")
     try:
-        from transformers import pipeline
+        from transformers import pipeline, VideoMAEImageProcessor
+        processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base-finetuned-kinetics")
         _video_pipeline = pipeline(
             "video-classification", 
             model="MCG-NJU/videomae-base-finetuned-kinetics", 
+            image_processor=processor,
             device=-1 
         )
         print("[inference] VideoMAE loaded.")
