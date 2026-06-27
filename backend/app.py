@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from inference import load_models, predict
+from compress import compress_video
 
 # ── App Setup ──────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -23,11 +24,24 @@ def allowed_file(filename):
 
 
 # ── Background Worker ──────────────────────────────────────────────
-def async_inference_task(task_id, video_path):
+def async_inference_task(task_id, video_path, model_type='transformer'):
     status_file = os.path.join(app.config['UPLOAD_FOLDER'], f"task_{task_id}.json")
+    
+    # Generate a filename for the compressed version
+    compressed_path = video_path.rsplit('.', 1)[0] + '_compressed.mp4'
+    
     try:
-        # Run inference
-        result = predict(video_path)
+        # 1. Compress the video before inference!
+        # This limits it to 300 frames and scales it down, fixing sparse sampling and decoding bugs
+        print("[app] Starting video compression...")
+        is_compressed = compress_video(video_path, compressed_path)
+        
+        # If compression succeeded, use the compressed video for inference. 
+        # Otherwise, fall back to the original video just in case.
+        final_video_to_process = compressed_path if is_compressed else video_path
+        
+        # 2. Run inference on the video
+        result = predict(final_video_to_process, model_type=model_type)
         
         if result.get('error'):
             task_data = {'status': 'failed', 'error': result['error']}
@@ -38,12 +52,13 @@ def async_inference_task(task_id, video_path):
         task_data = {'status': 'failed', 'error': str(e)}
         
     finally:
-        # Clean up video file
-        if os.path.exists(video_path):
-            try:
-                os.remove(video_path)
-            except Exception as e:
-                print(f"[app] Warning: Failed to remove temp video {video_path}: {e}")
+        # Clean up video files to save server space
+        for path_to_remove in [video_path, compressed_path]:
+            if os.path.exists(path_to_remove):
+                try:
+                    os.remove(path_to_remove)
+                except Exception as e:
+                    print(f"[app] Warning: Failed to remove temp video {path_to_remove}: {e}")
                 
     # Save result to status file
     try:
@@ -95,8 +110,11 @@ def predict_action():
         with open(status_file, 'w') as f:
             json.dump({'status': 'processing'}, f)
             
+        # Get model type
+        model_type = request.form.get('model_type', 'transformer')
+        
         # Start background thread for prediction
-        thread = threading.Thread(target=async_inference_task, args=(task_id, save_path))
+        thread = threading.Thread(target=async_inference_task, args=(task_id, save_path, model_type))
         thread.start()
         
         return jsonify({'task_id': task_id, 'status': 'processing'})

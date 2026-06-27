@@ -162,6 +162,118 @@ dropZone.addEventListener('drop', (e) => {
 });
 
 
+// ── Tabs Logic ───────────────────────────────────────────────────
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabBtns.forEach(b => b.classList.remove('active'));
+    tabContents.forEach(c => c.classList.remove('active'));
+    
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+
+// ── Live Camera & Recording Logic ────────────────────────────────
+const cameraPreview = document.getElementById('camera-preview');
+const startCameraBtn = document.getElementById('start-camera-btn');
+const startRecordBtn = document.getElementById('start-record-btn');
+const stopCameraBtn = document.getElementById('stop-camera-btn');
+const recordingTimer = document.getElementById('recording-timer');
+
+let mediaStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingInterval = null;
+
+async function startCamera() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    cameraPreview.srcObject = mediaStream;
+    startCameraBtn.style.display = 'none';
+    startRecordBtn.style.display = 'flex';
+    stopCameraBtn.style.display = 'flex';
+  } catch (err) {
+    showError("Camera access denied or no camera found.");
+    console.error(err);
+  }
+}
+
+function stopCamera() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+    mediaStream = null;
+  }
+  cameraPreview.srcObject = null;
+  startCameraBtn.style.display = 'flex';
+  startRecordBtn.style.display = 'none';
+  stopCameraBtn.style.display = 'none';
+  clearInterval(recordingInterval);
+  recordingTimer.textContent = '00:00';
+}
+
+function startRecording() {
+  if (!mediaStream) return;
+  
+  recordedChunks = [];
+  
+  // Choose mimeType (webm usually supported by Chrome/Firefox, mp4 for Safari)
+  let mimeType = 'video/webm';
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    mimeType = 'video/mp4';
+  }
+  
+  mediaRecorder = new MediaRecorder(mediaStream, { mimeType });
+  
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) {
+      recordedChunks.push(e.data);
+    }
+  };
+  
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: mimeType });
+    const ext = mimeType === 'video/mp4' ? 'mp4' : 'webm';
+    const file = new File([blob], `webcam_recording.${ext}`, { type: mimeType });
+    
+    // Switch to upload tab seamlessly and trigger predict
+    document.querySelector('.tab-btn[data-tab="upload-tab"]').click();
+    setFile(file);
+    setTimeout(() => predictBtn.click(), 500); // Auto-predict!
+    
+    startRecordBtn.innerHTML = '<span class="record-dot"></span> Record 5s Clip';
+    startRecordBtn.disabled = false;
+    recordingTimer.textContent = '00:00';
+    stopCamera();
+  };
+  
+  mediaRecorder.start();
+  
+  // UI Updates during recording
+  startRecordBtn.innerHTML = 'Recording...';
+  startRecordBtn.disabled = true;
+  
+  let seconds = 5;
+  recordingTimer.textContent = `00:0${seconds}`;
+  
+  recordingInterval = setInterval(() => {
+    seconds--;
+    recordingTimer.textContent = `00:0${seconds}`;
+    if (seconds <= 0) {
+      clearInterval(recordingInterval);
+      mediaRecorder.stop();
+    }
+  }, 1000);
+}
+
+startCameraBtn.addEventListener('click', startCamera);
+stopCameraBtn.addEventListener('click', stopCamera);
+startRecordBtn.addEventListener('click', startRecording);
+
+
 // ── Inference Request ────────────────────────────────────────────
 const loadingState = document.getElementById('loading-state');
 const resultContent = document.getElementById('result-content');
@@ -239,10 +351,17 @@ predictBtn.addEventListener('click', async () => {
                    window.location.hostname === '' || 
                    window.location.protocol === 'file:'
     ? 'http://127.0.0.1:5000'
-    : 'https://video-action-recognition-project.onrender.com';
+    // IMPORTANT: Update this to your actual Hugging Face Space URL
+    // e.g., 'https://YOUR_HF_USERNAME-YOUR_SPACE_NAME.hf.space'
+    : 'https://YOUR_HF_USERNAME-YOUR_SPACE_NAME.hf.space'; // Was: 'https://video-action-recognition-project.onrender.com'
 
   const formData = new FormData();
   formData.append('video', videoFile);
+  
+  const aiEngineSelect = document.getElementById('ai-engine-select');
+  if (aiEngineSelect) {
+    formData.append('model_type', aiEngineSelect.value);
+  }
 
   try {
     const response = await fetch(`${API_BASE}/predict`, {

@@ -16,8 +16,8 @@
   --border:        rgba(255, 255, 255, 0.08);
   --border-bright: rgba(255, 255, 255, 0.20);
   --text-primary:  #ffffff;
-  --text-secondary:#a0a0a0;
-  --text-muted:    #555555;
+  --text-secondary:#d1d5db; /* Increased brightness for better visibility */
+  --text-muted:    #9ca3af; /* Significantly brighter muted text */
   --accent:        #ffffff;
   --glow:          rgba(255, 255, 255, 0.06);
   --font-head:     'Space Grotesk', sans-serif;
@@ -326,7 +326,9 @@ section { padding: 100px 0; }
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
+  max-width: 800px;
+  margin: 0 auto;
   gap: 24px;
   align-items: start;
 }
@@ -372,6 +374,104 @@ section { padding: 100px 0; }
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+/* Input Tabs */
+.input-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-head);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.tab-btn:hover { color: var(--text-primary); background: var(--bg-elevated); }
+.tab-btn.active { color: #000; background: #fff; }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: fade-in 0.3s ease forwards; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Camera UI */
+.camera-container {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 16px;
+}
+
+#camera-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* Mirror effect */
+}
+
+.camera-overlay {
+  position: absolute;
+  top: 16px; right: 16px;
+  background: rgba(0,0,0,0.6);
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.camera-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.cam-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-head);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cam-btn.primary { background: #ff3333; color: #fff; }
+.cam-btn.primary:hover { background: #ff5555; }
+.cam-btn.secondary { background: var(--bg-elevated); color: #fff; border: 1px solid var(--border); }
+.cam-btn.secondary:hover { background: var(--bg-card); }
+
+.record-dot {
+  width: 8px; height: 8px;
+  background: #fff;
+  border-radius: 50%;
+  animation: pulse-dot 1s infinite;
 }
 
 /* Drop Zone */
@@ -536,6 +636,73 @@ section { padding: 100px 0; }
 }
 
 #loading-state.visible { display: block; }
+
+/* Dynamic Processing Animation */
+.processing-animation-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin: 10px auto 30px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  max-width: 320px;
+}
+
+.anim-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.anim-icon svg {
+  color: #fff;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+}
+
+.anim-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.anim-path {
+  flex: 1;
+  height: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.anim-line {
+  width: 100%;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--border-bright) 0, var(--border-bright) 6px, transparent 6px, transparent 12px);
+  opacity: 0.5;
+}
+
+.anim-packet {
+  position: absolute;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 15px 4px rgba(255, 255, 255, 0.6);
+  animation: send-packet 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes send-packet {
+  0% { transform: translateX(0) scale(0.8); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateX(calc(100px)) scale(1.2); opacity: 0; }
+}
 
 .loader-ring {
   width: 48px; height: 48px;

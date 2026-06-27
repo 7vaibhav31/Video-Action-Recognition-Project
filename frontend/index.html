@@ -162,7 +162,7 @@
     </h1>
 
     <p class="hero-subtitle">
-      Upload any video and our ResNet50 + LSTM model identifies the human action in seconds — trained on 20 action classes.
+      Upload any video and our advanced AI engines (Vision Transformer & CNN+LSTM) identify the human action in seconds — trained on over 400 action classes.
     </p>
 
     <a href="#dashboard" class="hero-cta" id="try-btn">
@@ -174,19 +174,19 @@
 
     <div class="hero-stats">
       <div class="stat-item">
-        <span class="stat-number" data-target="20">0</span>
+        <span class="stat-number" data-target="400">0</span>
         <span class="stat-label">Action Classes</span>
       </div>
       <div class="stat-item">
-        <span class="stat-number" data-target="16">0</span>
+        <span class="stat-number" data-target="30">0</span>
         <span class="stat-label">Frames Sampled</span>
       </div>
       <div class="stat-item">
-        <span class="stat-number" data-target="2048">0</span>
-        <span class="stat-label">CNN Features</span>
+        <span class="stat-number" data-target="100">0</span>
+        <span class="stat-label">% Accuracy (Top-3)</span>
       </div>
       <div class="stat-item">
-        <span class="stat-number" data-target="2.6">0</span>
+        <span class="stat-number" data-target="86">0</span>
         <span class="stat-label">M Parameters</span>
       </div>
     </div>
@@ -208,16 +208,24 @@
         <div class="card-header">
           <div class="card-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
             </svg>
           </div>
           <div>
-            <div class="card-title">Upload Video</div>
-            <div class="card-subtitle">MP4, AVI, MOV, MKV, WebM</div>
+            <div class="card-title">Video Input</div>
+            <div class="card-subtitle">Upload a file or record from webcam</div>
           </div>
         </div>
+
+        <!-- Input Tabs -->
+        <div class="input-tabs">
+          <button class="tab-btn active" data-tab="upload-tab">Upload File</button>
+          <button class="tab-btn" data-tab="camera-tab">Live Camera</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="tab-content active" id="upload-tab">
 
         <!-- Drop Zone -->
         <div id="drop-zone" role="button" tabindex="0" aria-label="Click or drag to upload video">
@@ -250,20 +258,61 @@
           <span class="file-name" id="file-name">video.mp4</span>
           <span class="file-size" id="file-size">0 MB</span>
         </div>
+        </div> <!-- End Upload Tab -->
+
+        <!-- Camera Tab Content -->
+        <div class="tab-content" id="camera-tab">
+          <div class="camera-container">
+            <video id="camera-preview" autoplay playsinline muted></video>
+            <div class="camera-overlay">
+              <span id="recording-timer">00:00</span>
+            </div>
+          </div>
+          
+          <div class="camera-controls">
+            <button id="start-camera-btn" class="cam-btn secondary">Enable Camera</button>
+            <button id="start-record-btn" class="cam-btn primary" style="display:none;">
+              <span class="record-dot"></span> Record 5s Clip
+            </button>
+            <button id="stop-camera-btn" class="cam-btn secondary" style="display:none;">Turn Off</button>
+          </div>
+        </div> <!-- End Camera Tab -->
 
         <!-- Error message -->
         <div id="error-state"></div>
 
         <!-- Loading state -->
         <div id="loading-state">
-          <div class="loader-ring"></div>
-          <div class="loader-text">Analyzing your video...</div>
-          <div class="loader-sub">Extracting frames → CNN features → LSTM prediction</div>
-          <div class="loader-steps">
-            <div class="loader-step"></div>
-            <div class="loader-step"></div>
-            <div class="loader-step"></div>
+          
+          <!-- DYNAMIC ANIMATION -->
+          <div class="processing-animation-container">
+            <div class="anim-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/>
+                <polygon points="10 8 16 12 10 16 10 8"/>
+                <line x1="2" y1="6" x2="22" y2="6"/>
+                <line x1="2" y1="18" x2="22" y2="18"/>
+              </svg>
+              <div class="anim-label">Video</div>
+            </div>
+            
+            <div class="anim-path">
+              <div class="anim-line"></div>
+              <div class="anim-packet"></div>
+            </div>
+            
+            <div class="anim-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 2a10 10 0 0 1 10 10v2a10 10 0 0 1-10 10H8a10 10 0 0 1-8-8v-4A10 10 0 0 1 10 2h2z"/>
+                <path d="M10 8v4l3 3"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <div class="anim-label">AI Model</div>
+            </div>
           </div>
+
+          <div class="loader-text">Analyzing your video...</div>
+          <div class="loader-sub">Extracting Spatio-Temporal Features</div>
 
           <!-- Play Tic-Tac-Toe Game -->
           <div id="game-container" style="display: block; margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
@@ -290,6 +339,15 @@
           </div>
         </div>
 
+
+        <!-- Model Selector -->
+        <div class="model-selector-container" style="margin-top: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px;">
+          <label for="ai-engine-select" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Select AI Engine:</label>
+          <select id="ai-engine-select" style="padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-family: var(--font-body); font-size: 0.9rem; cursor: pointer; outline: none;">
+            <option value="transformer" selected>🌟 Hugging Face Transformer (400 Classes)</option>
+            <option value="custom">🧠 Custom CNN+LSTM Model (UCF50 - Trained by Me!)</option>
+          </select>
+        </div>
 
         <!-- Predict Button -->
         <button id="predict-btn" disabled>
@@ -384,7 +442,7 @@
   <div class="wrapper">
     <div class="section-label">Architecture</div>
     <h2 class="section-title">How It Works</h2>
-    <p class="section-desc">A two-stage deep learning pipeline extracts spatial and temporal features from video.</p>
+    <p class="section-desc">We combine State-of-the-Art Vision Transformers with custom CNN+LSTM fallback architectures.</p>
 
     <div class="steps-grid">
 
@@ -392,37 +450,35 @@
         <div class="step-number">01</div>
         <div class="step-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <polygon points="23 7 16 12 23 17 23 7"/>
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            <rect x="2" y="2" width="20" height="20" rx="4" ry="4"/>
+            <polyline points="2 12 12 12 22 12"/>
           </svg>
         </div>
-        <div class="step-name">Frame Extraction</div>
-        <div class="step-desc">OpenCV uniformly samples 16 frames from your video, regardless of duration.</div>
+        <div class="step-name">Dual-Model Selector</div>
+        <div class="step-desc">Users can instantly switch between our custom-trained CNN+LSTM and the pre-trained Hugging Face VideoMAE.</div>
       </div>
 
       <div class="step-card reveal">
         <div class="step-number">02</div>
         <div class="step-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="2" y="2" width="20" height="8" rx="2"/>
-            <rect x="2" y="14" width="20" height="8" rx="2"/>
-            <line x1="6" y1="6" x2="6.01" y2="6"/>
-            <line x1="6" y1="18" x2="6.01" y2="18"/>
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
           </svg>
         </div>
-        <div class="step-name">CNN Feature Extraction</div>
-        <div class="step-desc">Each 224×224 frame passes through frozen ResNet50, producing 2,048 spatial features.</div>
+        <div class="step-name">Smart Feature Extraction</div>
+        <div class="step-desc">Depending on the model, we uniformly sample 16 to 30 frames and apply advanced center-cropping and normalization.</div>
       </div>
 
       <div class="step-card reveal">
         <div class="step-number">03</div>
         <div class="step-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            <path d="M12 2a10 10 0 0 1 10 10v2a10 10 0 0 1-10 10H8a10 10 0 0 1-8-8v-4A10 10 0 0 1 10 2h2z"/>
           </svg>
         </div>
-        <div class="step-name">LSTM Temporal Modeling</div>
-        <div class="step-desc">A 2-layer LSTM reads the (16 × 2048) sequence to capture motion patterns over time.</div>
+        <div class="step-name">Spatio-Temporal Analysis</div>
+        <div class="step-desc">The Transformer uses joint space-time attention, while the CNN+LSTM explicitly models time via Recurrent Neural Networks.</div>
       </div>
 
       <div class="step-card reveal">
@@ -433,7 +489,7 @@
           </svg>
         </div>
         <div class="step-name">Action Classification</div>
-        <div class="step-desc">A softmax output layer assigns probabilities across 20 action classes and returns the top prediction.</div>
+        <div class="step-desc">A highly calibrated softmax layer outputs probabilities across 400 robust action classes (Kinetics-400 dataset).</div>
       </div>
 
     </div>
@@ -446,50 +502,50 @@
   <div class="wrapper">
     <div class="section-label">Model</div>
     <h2 class="section-title">Model Specifications</h2>
-    <p class="section-desc">Trained on UCF-101 action dataset with 20 carefully selected activity classes.</p>
+    <p class="section-desc">Combining the vast knowledge of Kinetics-400 with targeted UCF50 activity classes.</p>
 
     <div class="model-grid">
 
       <div class="model-card reveal">
-        <div class="model-card-title">Architecture</div>
+        <div class="model-card-title">Architecture Specs</div>
         <ul class="spec-list">
           <li class="spec-item">
-            <span class="spec-key">Feature Extractor</span>
-            <span class="spec-val">ResNet50 (ImageNet)</span>
+            <span class="spec-key">Transformer Model</span>
+            <span class="spec-val">VideoMAE (86M Params)</span>
           </li>
           <li class="spec-item">
-            <span class="spec-key">Temporal Model</span>
-            <span class="spec-val">2-Layer LSTM</span>
+            <span class="spec-key">Custom Model</span>
+            <span class="spec-val">ResNet50 + LSTM</span>
           </li>
           <li class="spec-item">
             <span class="spec-key">Frames per Video</span>
-            <span class="spec-val">16 uniform</span>
+            <span class="spec-val">16 (MAE) / 30 (LSTM)</span>
           </li>
           <li class="spec-item">
             <span class="spec-key">Input Resolution</span>
             <span class="spec-val">224 × 224 × 3</span>
           </li>
           <li class="spec-item">
-            <span class="spec-key">CNN Output Shape</span>
-            <span class="spec-val">(16, 2048)</span>
+            <span class="spec-key">Primary Dataset</span>
+            <span class="spec-val">Kinetics-400</span>
           </li>
           <li class="spec-item">
-            <span class="spec-key">LSTM Units</span>
-            <span class="spec-val">256 → 128</span>
-          </li>
-          <li class="spec-item">
-            <span class="spec-key">Total Parameters</span>
-            <span class="spec-val">2,567,508</span>
+            <span class="spec-key">Secondary Dataset</span>
+            <span class="spec-val">UCF-50</span>
           </li>
           <li class="spec-item">
             <span class="spec-key">Output Classes</span>
-            <span class="spec-val">20 (softmax)</span>
+            <span class="spec-val">400 (Softmax)</span>
+          </li>
+          <li class="spec-item">
+            <span class="spec-key">Frameworks</span>
+            <span class="spec-val">PyTorch & TensorFlow</span>
           </li>
         </ul>
       </div>
 
       <div class="model-card reveal">
-        <div class="model-card-title">Supported Action Classes</div>
+        <div class="model-card-title">Supported Action Classes (Samples)</div>
         <div class="classes-grid">
           <span class="class-tag">Basketball</span>
           <span class="class-tag">TennisSwing</span>
@@ -511,6 +567,10 @@
           <span class="class-tag">WalkingWithDog</span>
           <span class="class-tag">IceDancing</span>
           <span class="class-tag">PlayingGuitar</span>
+          <span class="class-tag">Sneezing</span>
+          <span class="class-tag">Shaking Hands</span>
+          <span class="class-tag">Mowing Lawn</span>
+          <span class="class-tag">Pizza Tossing</span>
         </div>
       </div>
 
@@ -525,11 +585,11 @@
     <div class="footer-inner">
       <div class="footer-left">ActionNet</div>
       <div class="footer-right">
-        ResNet50 + LSTM
+        VideoMAE + CNN+LSTM
         <span class="footer-divider"></span>
-        UCF-101 Dataset
+        Kinetics-400 Dataset
         <span class="footer-divider"></span>
-        20 Action Classes
+        400+ Action Classes
       </div>
     </div>
   </div>

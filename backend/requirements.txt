@@ -6,3 +6,5 @@ werkzeug>=3.0.0
 gunicorn>=21.0.0
 flask-cors>=4.0.0
 av>=10.0.0
+transformers>=4.30.0
+torch>=2.0.0

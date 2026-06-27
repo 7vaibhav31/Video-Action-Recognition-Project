@@ -1,284 +1,194 @@
 """
 inference.py — Model loading and prediction pipeline.
-Loads ResNet50 (feature extractor) and best_modelllll.keras (LSTM classifier)
-once at startup. Exposes a predict(video_path) function.
+Supports both Hugging Face Transformers and Custom CNN+LSTM Models.
 """
 
 import os
-
-# Limit TensorFlow thread-pool allocations before importing to conserve memory
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
-os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
-os.environ['NUMEXPR_NUM_THREADS'] = '1'
-
 import time
 import gc
-import numpy as np
 import cv2
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.layers import GlobalAveragePooling2D, Input
-from tensorflow.keras.models import Model
+import numpy as np
 
-# ── Class Labels (same order as training) ─────────────────────────
-SELECTED_CLASSES = [
-    "Basketball", "TennisSwing", "GolfSwing", "Archery", "Bowling",
-    "Diving", "Rafting", "Surfing",
-    "PullUps", "PushUps", "Lunges", "JumpingJack",
-    "Skiing", "HorseRiding", "Biking",
-    "Typing", "Swing", "WalkingWithDog",
-    "IceDancing", "PlayingGuitar",
+# ── Global model references ───────────────
+_video_pipeline = None
+_custom_model = None
+_cnn_extractor = None
+
+# UCF50 Classes (50)
+UCF50_CLASSES = [
+    'BaseballPitch', 'Basketball', 'BenchPress', 'Biking', 'Billiards', 
+    'BreastStroke', 'CleanAndJerk', 'Diving', 'Drumming', 'Fencing', 
+    'GolfSwing', 'HighJump', 'HorseRace', 'HorseRiding', 'HulaHoop', 
+    'JavelinThrow', 'JugglingBalls', 'JumpRope', 'JumpingJack', 'Kayaking', 
+    'Lunges', 'MilitaryParade', 'Mixing', 'Nunchucks', 'PizzaTossing', 
+    'PlayingGuitar', 'PlayingPiano', 'PlayingTabla', 'PlayingViolin', 'PoleVault', 
+    'PommelHorse', 'PullUps', 'Punch', 'PushUps', 'RockClimbingIndoor', 
+    'RopeClimbing', 'Rowing', 'SalsaSpin', 'SkateBoarding', 'Skiing', 
+    'Skijet', 'SoccerJuggling', 'Swing', 'TaiChi', 'TennisSwing', 
+    'ThrowDiscus', 'TrampolineJumping', 'VolleyballSpiking', 'WalkingWithDog', 'YoYo'
 ]
 
-# ── Config ─────────────────────────────────────────────────────────
-NUM_FRAMES  = 16
-IMG_SIZE    = 224
-# ── Model Path (Supports local and Vercel serverless) ───────────────
-_local_path = os.path.join(os.path.dirname(__file__), 'model_optionA_final.keras')
-if os.path.exists(_local_path):
-    MODEL_PATH = _local_path
-else:
-    MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'model_optionA_final.keras')
-
-# ── Global model references (loaded once at startup) ───────────────
-_cnn_model   = None
-_lstm_model  = None
-
-
-def _build_cnn():
-    """Build frozen ResNet50 feature extractor."""
-    base = ResNet50(weights='imagenet', include_top=False, input_shape=(IMG_SIZE, IMG_SIZE, 3))
-    base.trainable = False
-    inp = Input(shape=(IMG_SIZE, IMG_SIZE, 3))
-    out = base(inp, training=False)
-    out = GlobalAveragePooling2D()(out)
-    return Model(inp, out, name='ResNet50_FeatureExtractor')
-
-
 def load_models():
-    """Load both models into memory. Call once at app startup."""
-    global _cnn_model, _lstm_model
+    """Load Hugging Face and Custom Keras models into memory. Call once at app startup."""
+    global _video_pipeline, _custom_model, _cnn_extractor
     
-    # Optimize TensorFlow CPU performance on limited hosting environments (like Render Free CPU)
-    # Restricts thread spawning overhead to prevent CPU throttling and context switching
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['OMP_NUM_THREADS'] = '1' # Keep CPU usage stable
+    
+    print("[inference] Loading Hugging Face VideoMAE model...")
     try:
-        tf.config.threading.set_intra_op_parallelism_threads(1)
-        tf.config.threading.set_inter_op_parallelism_threads(1)
-        print("[inference] TensorFlow CPU threading optimized (threads set to 1).")
-    except Exception as e:
-        print(f"[inference] Warning: Could not set TensorFlow threading configuration: {e}")
+        from transformers import pipeline
+        _video_pipeline = pipeline(
+            "video-classification", 
+            model="MCG-NJU/videomae-base-finetuned-kinetics", 
+            device=-1 
+        )
+        print("[inference] VideoMAE loaded.")
+    except ImportError as e:
+        print(f"[inference] Error importing transformers: {e}")
+        
+    print("[inference] Loading Custom CNN+LSTM Model (kinetics_best_model.keras)...")
+    try:
+        import tensorflow as tf
+        from tensorflow.keras.applications import ResNet50
+        from tensorflow.keras.models import Model, load_model
+        from tensorflow.keras.layers import GlobalAveragePooling2D, Input
+        
+        # Load the saved Keras model
+        model_path = os.path.join(os.path.dirname(__file__), 'models', 'kinetics_best_model.keras')
+        if os.path.exists(model_path):
+            _custom_model = load_model(model_path)
+            print("[inference] Custom CNN+LSTM model loaded.")
+            
+            # Setup ResNet50 feature extractor
+            base_cnn = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+            cnn_input = Input(shape=(224, 224, 3))
+            cnn_out = base_cnn(cnn_input, training=False)
+            cnn_out = GlobalAveragePooling2D()(cnn_out)
+            _cnn_extractor = Model(cnn_input, cnn_out, name='CNN_FeatureExtractor')
+            print("[inference] ResNet50 CNN Extractor loaded.")
+        else:
+            print(f"[inference] Warning: Custom model not found at {model_path}")
+            
+    except ImportError as e:
+        print(f"[inference] Error importing tensorflow: {e}")
+        print("[inference] Make sure 'tensorflow' is installed.")
 
-    print("[inference] Loading ResNet50 feature extractor...")
-    _cnn_model = _build_cnn()
-    print("[inference] ResNet50 loaded.")
 
-    print(f"[inference] Loading LSTM classifier from: {MODEL_PATH}")
-    _lstm_model = load_model(MODEL_PATH)
-    print("[inference] LSTM model loaded. Ready for inference.")
-
-
-def extract_frames_opencv(video_path):
-    """Attempt to extract frames using OpenCV."""
+def extract_features(video_path, num_frames=30, img_size=224):
+    """Extract ResNet50 features from video for the custom model."""
+    from tensorflow.keras.applications.resnet50 import preprocess_input
+    
     cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print("[inference] OpenCV: VideoCapture failed to open file.")
-        cap.release()
-        return None
-        
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(f"[inference] OpenCV: Total frames in video: {total_frames}")
-
+    
     if total_frames <= 0:
-        print("[inference] OpenCV: Total frames <= 0. Attempting sequential read...")
-        count = 0
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            count += 1
-        total_frames = count
-        print(f"[inference] OpenCV: Counted {total_frames} frames sequentially.")
         cap.release()
-        cap = cv2.VideoCapture(video_path)
-        if total_frames <= 0:
-            cap.release()
-            return None
-
-    frame_indices = set(np.linspace(0, total_frames - 1, NUM_FRAMES, dtype=int))
-    print(f"[inference] OpenCV: Sampling 16 frames at indices: {list(sorted(frame_indices))}")
-    
-    frames = []
-    count = 0
-    while len(frames) < NUM_FRAMES:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if count in frame_indices:
-            frame = cv2.resize(frame, (IMG_SIZE, IMG_SIZE))
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = frame / 255.0
-            frames.append(frame)
-        count += 1
-        
-    cap.release()
-
-    # Only pad if we got at least 1 frame, otherwise return None to fallback
-    if len(frames) > 0:
-        while len(frames) < NUM_FRAMES:
-            print(f"[inference] OpenCV Warning: padded frame with zeros (got {len(frames)} of {NUM_FRAMES})")
-            frames.append(np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.float32))
-        return np.array(frames, dtype=np.float32)
-    return None
-
-
-def extract_frames_pyav(video_path):
-    """Attempt to extract frames using PyAV (av)."""
-    import av
-    container = av.open(video_path)
-    try:
-        if not container.streams.video:
-            print("[inference] PyAV: No video stream found in container.")
-            return None
-        stream = container.streams.video[0]
-        total_frames = stream.frames
-        
-        if total_frames is None or total_frames <= 0:
-            print("[inference] PyAV: Stream frames <= 0 or None. Counting sequentially...")
-            total_frames = 0
-            for frame in container.decode(video=0):
-                total_frames += 1
-            print(f"[inference] PyAV: Counted {total_frames} frames sequentially.")
-            container.close()
-            container = av.open(video_path)
-            
-        if total_frames <= 0:
-            print("[inference] PyAV: Total counted frames <= 0.")
-            return None
-            
-        frame_indices = set(np.linspace(0, total_frames - 1, NUM_FRAMES, dtype=int))
-        print(f"[inference] PyAV: Sampling 16 frames at indices: {list(sorted(frame_indices))}")
-        
-        frames = []
-        count = 0
-        for frame in container.decode(video=0):
-            if count in frame_indices:
-                img = frame.to_ndarray(format='rgb24')
-                img_resized = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
-                img_normalized = img_resized / 255.0
-                frames.append(img_normalized)
-                if len(frames) == NUM_FRAMES:
-                    break
-            count += 1
-            
-        if len(frames) > 0:
-            while len(frames) < NUM_FRAMES:
-                print(f"[inference] PyAV Warning: padded frame with zeros (got {len(frames)} of {NUM_FRAMES})")
-                frames.append(np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.float32))
-            return np.array(frames, dtype=np.float32)
         return None
-    finally:
-        container.close()
 
-
-def extract_frames(video_path):
-    """
-    Extract NUM_FRAMES uniformly sampled frames from a video.
-    Tries OpenCV first, and falls back to PyAV if OpenCV fails.
-    Returns tuple (numpy array, error_message).
-    """
-    print(f"\n[inference] Loading video file: {video_path}")
-    
-    cv_error = None
-    pyav_error = None
-    
-    # 1. Try OpenCV
-    try:
-        frames = extract_frames_opencv(video_path)
-        if frames is not None and len(frames) == NUM_FRAMES:
-            print("[inference] OpenCV extraction succeeded.")
-            return frames, None
-        cv_error = "OpenCV returned 0 or incomplete frames."
-    except Exception as e:
-        cv_error = f"OpenCV Exception: {str(e)}"
-        print(f"[inference] OpenCV extraction failed with exception: {e}")
+    # Focus on the middle of the video (max 150 frames)
+    MAX_ACTION_FRAMES = 150
+    if total_frames <= MAX_ACTION_FRAMES:
+        start_frame = 0
+        end_frame = total_frames - 1
+    else:
+        start_frame = (total_frames - MAX_ACTION_FRAMES) // 2
+        end_frame = start_frame + MAX_ACTION_FRAMES - 1
         
-    print("[inference] OpenCV failed. Trying PyAV as fallback...")
+    frame_indices = np.linspace(start_frame, end_frame, num_frames, dtype=int)
+    frames = []
+
+    for idx in frame_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if ret:
+            # Center crop
+            h, w = frame.shape[:2]
+            min_dim = min(h, w)
+            start_x = (w - min_dim) // 2
+            start_y = (h - min_dim) // 2
+            frame = frame[start_y:start_y+min_dim, start_x:start_x+min_dim]
+            
+            # Resize and color space
+            frame = cv2.resize(frame, (img_size, img_size))
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(frame)
+        else:
+            frames.append(np.zeros((img_size, img_size, 3)))
+
+    cap.release()
+    frames = np.array(frames, dtype=np.float32)
+    frames = preprocess_input(frames)
     
-    # 2. Try PyAV
-    try:
-        frames = extract_frames_pyav(video_path)
-        if frames is not None and len(frames) == NUM_FRAMES:
-            print("[inference] PyAV extraction succeeded.")
-            return frames, None
-        pyav_error = "PyAV returned 0 or incomplete frames."
-    except Exception as e:
-        pyav_error = f"PyAV Exception: {str(e)}"
-        print(f"[inference] PyAV extraction failed with exception: {e}")
-        
-    combined_error = f"OpenCV Error: {cv_error} | PyAV Error: {pyav_error}"
-    print(f"[inference] ERROR: All frame extraction backends failed. {combined_error}")
-    return None, combined_error
+    # Extract CNN Features
+    features = _cnn_extractor.predict(frames, verbose=0)
+    return features
 
 
-def predict(video_path):
+def predict(video_path, model_type='transformer'):
     """
-    Run full inference on a video file.
-
-    Args:
-        video_path: absolute path to the video file
-
-    Returns:
-        dict with keys:
-            - predicted_class (str)
-            - confidence (float, 0-100)
-            - top3 (list of {label, confidence})
-            - processing_time (float, seconds)
-            - error (str, only if failed)
+    Run full inference on a video file using the selected model.
     """
-    if _cnn_model is None or _lstm_model is None:
-        return {"error": "Models not loaded. Call load_models() first."}
-
     start = time.time()
+    
+    def format_label(label):
+        # Format labels beautifully (e.g., 'playing basketball' -> 'Playing Basketball', 'SoccerJuggling' -> 'Soccer Juggling')
+        import re
+        s = label.replace('_', ' ')
+        s = re.sub(r"([A-Z])", r" \1", s).strip()
+        return " ".join([word.capitalize() for word in s.split()])
 
     try:
-        # Step 1: Extract frames
-        frames, err_msg = extract_frames(video_path)
-        if frames is None:
-            return {"error": f"Could not read video: {err_msg if err_msg else 'Unknown frame extraction error.'}"}
+        if model_type == 'custom':
+            print(f"\n[inference] Running Custom CNN+LSTM on {video_path}...")
+            if _custom_model is None or _cnn_extractor is None:
+                return {"error": "Custom model not loaded properly. Check logs."}
+                
+            features = extract_features(video_path, num_frames=30)
+            if features is None or len(features) != 30:
+                return {"error": "Failed to extract features from video."}
+                
+            # Model expects batch dimension: (1, 30, 2048)
+            features_batch = np.expand_dims(features, axis=0)
+            
+            # Predict
+            predictions = _custom_model.predict(features_batch, verbose=0)[0]
+            
+            # Get top 3
+            top_indices = np.argsort(predictions)[-3:][::-1]
+            results = []
+            for idx in top_indices:
+                results.append({
+                    "label": UCF50_CLASSES[idx] if idx < len(UCF50_CLASSES) else f"Class_{idx}",
+                    "score": float(predictions[idx])
+                })
+                
+        else:
+            # Transformer Model
+            print(f"\n[inference] Running HF VideoMAE on {video_path}...")
+            if _video_pipeline is None:
+                return {"error": "Hugging Face model not loaded. Call load_models() first."}
+                
+            results = _video_pipeline(video_path, top_k=3)
+            
+        print(f"[inference] Inference complete. Raw results: {results}")
 
-        # Step 2: Extract CNN features → (16, 2048)
-        print("[inference] Running ResNet50 feature extraction...")
-        features = _cnn_model.predict(frames, verbose=0)  # (16, 2048)
-        print(f"[inference] Feature extraction complete. Output shape: {features.shape}")
+        if not results:
+            return {"error": "Model returned empty predictions."}
 
-        # Step 3: Add batch dim → (1, 16, 2048) and run LSTM
-        print("[inference] Running LSTM classification...")
-        features_batch = np.expand_dims(features, axis=0)
-        probs = _lstm_model.predict(features_batch, verbose=0)[0]  # (20,)
-        
-        # Step 4: Build results
-        top_idx = int(np.argmax(probs))
-        top3_indices = np.argsort(probs)[::-1][:3]
-        
-        print(f"[inference] Model prediction complete. Top Class: {SELECTED_CLASSES[top_idx]} ({probs[top_idx]*100:.2f}%)")
-        print(f"[inference] Top 3 probabilities: " + ", ".join([f"{SELECTED_CLASSES[i]}: {probs[i]*100:.1f}%" for i in top3_indices]))
-
+        top_label = results[0]['label']
+        top_score = results[0]['score']
         processing_time = round(time.time() - start, 2)
-
+        
         return {
-            "predicted_class": SELECTED_CLASSES[top_idx],
-            "confidence": round(float(probs[top_idx]) * 100, 2),
+            "predicted_class": format_label(top_label),
+            "confidence": round(float(top_score) * 100, 2),
             "top3": [
                 {
-                    "label": SELECTED_CLASSES[i],
-                    "confidence": round(float(probs[i]) * 100, 2)
+                    "label": format_label(res['label']),
+                    "confidence": round(float(res['score']) * 100, 2)
                 }
-                for i in top3_indices
+                for res in results
             ],
             "processing_time": processing_time,
             "error": None
@@ -288,5 +198,4 @@ def predict(video_path):
         print(f"[inference] EXCEPTION encountered during prediction: {e}")
         return {"error": str(e)}
     finally:
-        # Explicitly run garbage collection to free temporary tensors from memory
         gc.collect()
