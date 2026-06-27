@@ -35,20 +35,6 @@ def load_models():
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     os.environ['OMP_NUM_THREADS'] = '1' # Keep CPU usage stable
     
-    print("[inference] Loading Hugging Face VideoMAE model...")
-    try:
-        from transformers import pipeline, VideoMAEImageProcessor
-        processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base-finetuned-kinetics")
-        _video_pipeline = pipeline(
-            "video-classification", 
-            model="MCG-NJU/videomae-base-finetuned-kinetics", 
-            image_processor=processor,
-            device=-1 
-        )
-        print("[inference] VideoMAE loaded.")
-    except ImportError as e:
-        print(f"[inference] Error importing transformers: {e}")
-        
     print("[inference] Loading Custom CNN+LSTM Model (kinetics_best_model.keras)...")
     try:
         import tensorflow as tf
@@ -62,7 +48,14 @@ def load_models():
             model_path = os.path.join(os.path.dirname(__file__), 'kinetics_best_model.keras')
             
         if os.path.exists(model_path):
-            _custom_model = load_model(model_path)
+            # Pass custom object to strip quantization_config if TF downgrades to Keras 2
+            from tensorflow.keras.layers import Dense
+            class SafeDense(Dense):
+                def __init__(self, **kwargs):
+                    kwargs.pop('quantization_config', None)
+                    super().__init__(**kwargs)
+                    
+            _custom_model = load_model(model_path, custom_objects={'Dense': SafeDense})
             print(f"[inference] Custom CNN+LSTM model loaded from {model_path}.")
             
             # Setup ResNet50 feature extractor
@@ -78,6 +71,20 @@ def load_models():
     except ImportError as e:
         print(f"[inference] Error importing tensorflow: {e}")
         print("[inference] Make sure 'tensorflow' is installed.")
+
+    print("[inference] Loading Hugging Face VideoMAE model...")
+    try:
+        from transformers import pipeline, VideoMAEImageProcessor
+        processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base-finetuned-kinetics")
+        _video_pipeline = pipeline(
+            "video-classification", 
+            model="MCG-NJU/videomae-base-finetuned-kinetics", 
+            image_processor=processor,
+            device=-1 
+        )
+        print("[inference] VideoMAE loaded.")
+    except ImportError as e:
+        print(f"[inference] Error importing transformers: {e}")
 
 
 def extract_features(video_path, num_frames=30, img_size=224):
