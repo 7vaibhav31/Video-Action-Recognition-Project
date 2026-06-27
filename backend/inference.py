@@ -131,6 +131,13 @@ def predict(video_path, model_type='transformer'):
     """
     Run full inference on a video file using the selected model.
     """
+    global _video_pipeline, _custom_model
+    
+    # Lazy load models if they aren't loaded yet (e.g., Gunicorn worker edge cases)
+    if _video_pipeline is None or _custom_model is None:
+        print("[inference] Models not in memory. Lazy loading now...")
+        load_models()
+
     start = time.time()
     
     def format_label(label):
