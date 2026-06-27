@@ -48,14 +48,7 @@ def load_models():
             model_path = os.path.join(os.path.dirname(__file__), 'kinetics_best_model.keras')
             
         if os.path.exists(model_path):
-            # Pass custom object to strip quantization_config if TF downgrades to Keras 2
-            from tensorflow.keras.layers import Dense
-            class SafeDense(Dense):
-                def __init__(self, **kwargs):
-                    kwargs.pop('quantization_config', None)
-                    super().__init__(**kwargs)
-                    
-            _custom_model = load_model(model_path, custom_objects={'Dense': SafeDense})
+            _custom_model = load_model(model_path)
             print(f"[inference] Custom CNN+LSTM model loaded from {model_path}.")
             
             # Setup ResNet50 feature extractor
