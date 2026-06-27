@@ -351,9 +351,7 @@ predictBtn.addEventListener('click', async () => {
                    window.location.hostname === '' || 
                    window.location.protocol === 'file:'
     ? 'http://127.0.0.1:5000'
-    // IMPORTANT: Update this to your actual Hugging Face Space URL
-    // e.g., 'https://YOUR_HF_USERNAME-YOUR_SPACE_NAME.hf.space'
-    : 'https://YOUR_HF_USERNAME-YOUR_SPACE_NAME.hf.space'; // Was: 'https://video-action-recognition-project.onrender.com'
+    : 'https://vansh731-action-recognition-api.hf.space';
 
   const formData = new FormData();
   formData.append('video', videoFile);
