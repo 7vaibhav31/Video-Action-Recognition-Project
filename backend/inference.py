@@ -56,11 +56,14 @@ def load_models():
         from tensorflow.keras.models import Model, load_model
         from tensorflow.keras.layers import GlobalAveragePooling2D, Input
         
-        # Load the saved Keras model
+        # Load the saved Keras model (Look in 'models' folder first, then fallback to root)
         model_path = os.path.join(os.path.dirname(__file__), 'models', 'kinetics_best_model.keras')
+        if not os.path.exists(model_path):
+            model_path = os.path.join(os.path.dirname(__file__), 'kinetics_best_model.keras')
+            
         if os.path.exists(model_path):
             _custom_model = load_model(model_path)
-            print("[inference] Custom CNN+LSTM model loaded.")
+            print(f"[inference] Custom CNN+LSTM model loaded from {model_path}.")
             
             # Setup ResNet50 feature extractor
             base_cnn = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
