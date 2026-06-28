@@ -46,3 +46,19 @@ This file serves as a memory bank of all the critical edge-cases, bugs, and fixe
 * **The Problem**: `load_models()` was called directly at module-level in `app.py` (line 165). If model loading threw ANY unhandled exception, the gunicorn worker would crash, restart, crash again — in an infinite loop. HF Spaces would show "Building" forever.
 * **The Fix**: Wrapped the `load_models()` call in `try/except` in both the `__main__` and `else` (gunicorn) branches. Now the server ALWAYS boots. If models fail to load at startup, they will be lazy-loaded on the first prediction request.
 
+## 7. Wrong Import Path for Keras Patch (2026-06-28)
+* **The Problem**: The Keras compat patch tried `from tensorflow.keras.engine import base_layer` which fails on TF 2.15 because `tensorflow.keras.engine` is NOT exposed as a submodule. Error: `No module named 'tensorflow.keras.engine'`.
+* **The Fix**: Import from the standalone `keras` package instead, matching the actual installed paths shown in the tracebacks:
+  1. `from keras.src.engine.input_layer import InputLayer` (for InputLayer patch)
+  2. `from keras.src.engine.base_layer import Layer` (for universal from_config patch)
+  3. Falls back to `tensorflow.keras.layers` (public API) if internal paths change.
+
+## 8. The torchvision `read_video` Crash (2026-06-28)
+* **The Problem**: The HF Transformers `pipeline("video-classification")` internally calls `torchvision.io.read_video()` to read video files. But the installed torchvision version removed this function: `module 'torchvision.io' has no attribute 'read_video'`.
+* **The Fix**: **Bypassed the pipeline entirely.** Instead of using `pipeline(...)`, we now:
+  1. Load `VideoMAEImageProcessor` and `VideoMAEForVideoClassification` separately.
+  2. Read video frames ourselves using **OpenCV** (`_read_video_opencv()`).
+  3. Process frames through the image processor manually.
+  4. Run the model directly with `torch.no_grad()`.
+  5. This eliminates ALL dependency on `torchvision.io` for video reading.
+
