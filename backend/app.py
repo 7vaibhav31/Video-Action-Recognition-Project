@@ -157,9 +157,18 @@ def health():
 # ── Startup ────────────────────────────────────────────────────────
 if __name__ == '__main__':
     print("[app] Loading models at startup...")
-    load_models()
+    try:
+        load_models()
+    except Exception as e:
+        print(f"[app] ⚠️ Model loading failed at startup: {e}")
+        print("[app] Server will start anyway — models will lazy-load on first request.")
     print("[app] Starting Flask server...")
     app.run(debug=False, host='0.0.0.0', port=5000)
 else:
     # When run by gunicorn/Vercel, load models on module import
-    load_models()
+    # Wrapped in try/except to PREVENT gunicorn worker crash loops
+    try:
+        load_models()
+    except Exception as e:
+        print(f"[app] ⚠️ Model loading failed during gunicorn boot: {e}")
+        print("[app] Server will start anyway — models will lazy-load on first request.")
